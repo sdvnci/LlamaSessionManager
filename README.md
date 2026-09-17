@@ -1,5 +1,12 @@
 # LlamaSessionManager
 
+[![Linting](https://github.com/sdvnci/LlamaSessionManager/actions/workflows/linting.yml/badge.svg)](https://github.com/sdvnci/LlamaSessionManager/actions/workflows/linting.yml)
+[![TypeChecking](https://github.com/sdvnci/LlamaSessionManager/actions/workflows/typecheck.yml/badge.svg)](https://github.com/sdvnci/LlamaSessionManager/actions/workflows/typecheck.yml)
+![Ollama](https://img.shields.io/badge/ollama-%23000000.svg?style=for-the-badge&logo=ollama&logoColor=white)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Validation: Pydantic v2](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/pydantic/pydantic/main/docs/badge/v2.json)](https://pydantic.dev)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
+
 A simple service for running conversations with local AI models through Ollama.
 Handles message history, multi-session pooling, audio transcription, image OCR,
 tool dispatch, and session persistence

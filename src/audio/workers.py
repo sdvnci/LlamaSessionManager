@@ -44,9 +44,13 @@ def _worker_entry(model_name: str, job_queue: Queue, event_queue: Queue) -> None
     except Exception:
         traceback.print_exc()
 
+
 @final
 class TranscriptionWorker:
-    __slots__: Final[tuple[str, ...]] = ("_sequence", "_service",)
+    __slots__: Final[tuple[str, ...]] = (
+        "_sequence",
+        "_service",
+    )
 
     logger = getLogger("audio.worker")
 
@@ -197,6 +201,7 @@ class TranscriptionWorker:
                 return
             self.handle_job(job, events)
             self._service.release_cuda_cache()
+
 
 @final
 class BackgroundWhisperProcessPool:

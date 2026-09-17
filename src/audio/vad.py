@@ -4,6 +4,7 @@ Meetings contain long stretches of silence or ambient noise.  Transcribing
 those buffers wastes GPU time and invites whisper hallucinations, so every
 buffer is screened with WebRTC's VAD before it reaches the model.
 """
+
 from collections.abc import Iterator
 from typing import Final
 

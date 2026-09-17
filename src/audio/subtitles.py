@@ -6,7 +6,7 @@ derived from the segment's ``start``/``end`` float seconds.
 """
 
 from pathlib import Path
-from typing import Final
+from typing import Final, final
 
 from ._types import SubtitleFormat, TranscriptSegment
 
@@ -42,6 +42,7 @@ def segment_to_cue(
             segment.content.strip(),
         )
     )
+
 
 @final
 class SubtitleWriter:

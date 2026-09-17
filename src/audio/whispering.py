@@ -317,7 +317,7 @@ class TranscriptionService:
 
     def _iter_source_chunks(
         self,
-        source: "AudioSourceType",
+        source: AudioSourceType,
     ) -> Iterator[NDArray[np.float32]]:
         """Yield 1D waveform chunks from any supported audio source."""
         yield from self.chunk_audio(self._load_waveform(source))

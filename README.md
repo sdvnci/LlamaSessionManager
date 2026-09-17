@@ -7,10 +7,10 @@ tool dispatch, and session persistence
 
 ## What you need
 
-- **Python 3.13+** — [python.org](https://python.org)
-- **Ollama** — [ollama.com](https://ollama.com) (runs the AI models)
-- **ffmpeg** — `winget install ffmpeg` on Windows, or `brew install ffmpeg` on Mac
-- **Docker** (optional, for the server) — [docker.com](https://docker.com)
+- **Python 3.13+** : [python.org](https://python.org)
+- **Ollama** : [ollama.com](https://ollama.com) (runs the AI models)
+- **ffmpeg** : `winget install ffmpeg` on Windows, or `brew install ffmpeg` on Mac
+- **Docker** (optional, for the server) : [docker.com](https://docker.com)
 - **NVIDIA GPU** (recommended for transcription): a modern 8 GB card comfortably runs Whisper `large-v3`
 
 ## Install
@@ -57,7 +57,7 @@ async def chat():
         reply = await sess.send()
         print(reply.message.content)
 
-        # Follow-up — history is preserved automatically
+        # Follow-up : history is preserved automatically
         msg2 = sess.parse_content("And what about Germany?")
         await sess.add_message(msg2)
         reply2 = await sess.send()
@@ -69,7 +69,7 @@ asyncio.run(chat())
 
 ---
 
-## Adding context — files, images, and documents
+## Adding context : files, images, and documents
 
 `parse_content` is how you hand the AI anything beyond plain text.
 Pass a string (your instruction) together with one or more file paths,
@@ -95,15 +95,15 @@ print(reply.message.content)
 
 | What you drop in | Extensions | Needs a special model? |
 |------------------|------------|------------------------|
-| Images | `.png` `.jpg` `.jpeg` `.gif` `.bmp` `.webp` | Yes — a vision model |
-| PDFs | `.pdf` | No — any model works |
-| Word docs | `.docx` `.docm` `.dotx` `.dotm` | No — any model works |
-| Text / code | `.txt` `.md` `.csv` `.json` `.py` `.js` `.yaml` … | No — any model works |
-| Spreadsheets | `.csv` (read as raw text) | No — any model works |
+| Images | `.png` `.jpg` `.jpeg` `.gif` `.bmp` `.webp` | Yes : a vision model |
+| PDFs | `.pdf` | No : any model works |
+| Word docs | `.docx` `.docm` `.dotx` `.dotm` | No : any model works |
+| Text / code | `.txt` `.md` `.csv` `.json` `.py` `.js` `.yaml` … | No : any model works |
+| Spreadsheets | `.csv` (read as raw text) | No : any model works |
 
 ### Ask about an image
 
-You need a **vision model** — one that can "see" pictures:
+You need a **vision model** : one that can "see" pictures:
 
 ```python
 msg = sess.parse_content([
@@ -180,7 +180,7 @@ reply = await sess.send()
   sections instead of "summarise the whole thing".
 - **CSV files are sent as raw text.** The AI sees the comma-separated rows.
   For number crunching, ask it to extract specific columns or add up totals.
-- **Images go to the model as-is.** No resizing needed — Ollama handles
+- **Images go to the model as-is.** No resizing needed : Ollama handles
   base-64 encoding internally.
 
 ---

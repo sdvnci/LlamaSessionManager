@@ -1,0 +1,24 @@
+ollama
+psycopg[binary, pool]
+python-dotenv
+aenum
+pydantic
+cryptography
+ldap3
+types-ldap3
+pyjwt[crypto]
+bcrypt
+quart
+quart_schema
+websockets
+python-docx
+pypdf
+pymupdf
+Pillow
+webrtcvad
+torch
+setuptools
+setuptools-rust
+openai-whisper
+quart
+deskew

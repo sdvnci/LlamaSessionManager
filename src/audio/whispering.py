@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from os import PathLike
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import BinaryIO, Callable, Final, Iterator
+from typing import BinaryIO, Callable, Final, Iterator, TypeAlias
 
 # Must be set before any CUDA context is created.  The segmented allocator
 # avoids the fragmentation that OOMs long-running transcribe workers.
@@ -29,7 +29,7 @@ from whisper.audio import SAMPLE_RATE  # type: ignore[import-untyped]
 from ._types import TranscriptProgress, TranscriptSegment
 from .vad import VoiceActivityDetector
 
-AudioSourceType = (
+AudioSourceType: TypeAlias = (
     str
     | PathLike[str]
     | NDArray[np.float32]

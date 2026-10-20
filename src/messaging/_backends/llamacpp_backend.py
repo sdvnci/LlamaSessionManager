@@ -187,6 +187,8 @@ class LlamaCppBackend:
                 if callable(tool)
                 else Tool.model_validate(tool)
             )
+            if spec.function is None:
+                raise ValueError(f"Tool {tool!r} has no function definition.")
             converted.append(
                 {
                     "type": "function",

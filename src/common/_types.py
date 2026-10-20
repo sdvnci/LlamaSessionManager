@@ -11,13 +11,16 @@ from typing import (
     NotRequired,
     Self,
     TypedDict,
+    final,
 )
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
 
 
-class Sentinel: ...
+@final
+class Sentinel:
+    __slots__ = ()
 
 
 class UIDTagged(ABC, BaseModel):
@@ -60,7 +63,7 @@ class UpdateStamped(ABC, BaseModel):
 
 class QueuedMessage(TypedDict):
     """
-    Message envelope that flows through a producer → consumer pipeline.
+    Message envelope that flows through a producer -> consumer pipeline.
     Compatibility with Ollama's Message dicts.
     ``image_paths`` contains absolute path strings that the consuming session
     should resolve to ``Path`` objects and pass to ``parse_content``.

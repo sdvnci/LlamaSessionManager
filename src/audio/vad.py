@@ -24,7 +24,7 @@ class VoiceActivityDetector:
 
     ``mode`` selects the VAD aggressiveness: 0 is the least aggressive
     (most permissive) and 3 the most aggressive.  Higher modes reject more
-    ambient noise.  Mode 2 — the default — ignores white noise below
+    ambient noise.  Mode 2 - the default - ignores white noise below
     roughly -30 dBFS in testing.
 
     ``min_speech_ratio`` is the minimum fraction of frames that must be

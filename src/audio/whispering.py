@@ -12,6 +12,7 @@ os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 import numpy as np
 from numpy import ceil, float32, uint32, zeros
 from numpy.typing import NDArray
+import torch
 from torch import cuda, inference_mode
 from whisper import (  # type: ignore[import-untyped]
     DecodingOptions,
@@ -39,21 +40,32 @@ AudioSourceType = (
 )
 
 
-def select_cuda_device() -> str:
-    """Return the CUDA device with the most free VRAM, or ``"cpu"``.
+def select_device() -> str:
+    """Return the accelerator Whisper should run on.
 
-    The Ollama container (and anything else sharing the box) may already
-    occupy one card; picking the least-loaded GPU avoids OOM collisions.
+    Prefers the least-loaded CUDA GPU, then an Intel XPU device (Arc),
+    then CPU.  On multi-GPU boxes the least-loaded card is picked so the
+    Ollama container (and anything else sharing the machine) avoids OOM
+    collisions.
     """
-    if not cuda.is_available():
-        return "cpu"
-    if cuda.device_count() <= 1:
-        return "cuda"
-    best = max(
-        range(cuda.device_count()),
-        key=lambda i: cuda.mem_get_info(i)[0],
-    )
-    return f"cuda:{best}"
+    if cuda.is_available():
+        if cuda.device_count() <= 1:
+            return "cuda"
+        best = max(
+            range(cuda.device_count()),
+            key=lambda i: cuda.mem_get_info(i)[0],
+        )
+        return f"cuda:{best}"
+    xpu = getattr(torch, "xpu", None)
+    if xpu is not None and xpu.is_available():
+        if xpu.device_count() <= 1:
+            return "xpu"
+        best = max(
+            range(xpu.device_count()),
+            key=lambda i: xpu.mem_get_info(i)[0],
+        )
+        return f"xpu:{best}"
+    return "cpu"
 
 
 def default_transcriber_initializer(
@@ -62,7 +74,7 @@ def default_transcriber_initializer(
     """Load the Whisper model, reusing an already-loaded one.
 
     Whisper's ``load_model`` maps the fp32 checkpoint straight onto the GPU
-    and then moves the fp32 model there too — a ~12 GB peak for large-v3
+    and then moves the fp32 model there too - a ~12 GB peak for large-v3
     that no 8 GB card survives.  Load on CPU instead and move once, keeping
     the GPU peak at the model's fp32 size (~6.2 GB).
 
@@ -74,7 +86,7 @@ def default_transcriber_initializer(
         return service.TRANSCRIBER
 
     model = load_model(model_name, device="cpu", in_memory=False)
-    if service.DEVICE.startswith("cuda"):
+    if service.DEVICE.startswith(("cuda", "xpu")):
         model = model.to(service.DEVICE)
     return model
 
@@ -82,7 +94,7 @@ def default_transcriber_initializer(
 class TranscriptionService:
     """A service that handles transcription of audio data using Whisper.
 
-    All audio — whether from a file path, raw bytes, or a readable stream —
+    All audio - whether from a file path, raw bytes, or a readable stream -
     is decoded through whisper's own ``load_audio`` (which invokes ffmpeg
     internally) so the mel-spectrogram stage always receives the exact format
     the model expects.
@@ -107,7 +119,7 @@ class TranscriptionService:
         vad_min_speech_ratio: float = 0.0,
     ) -> None:
         self._TRANSCRIBER: Whisper | None = None
-        self._DEVICE: Final[str] = select_cuda_device()
+        self._DEVICE: Final[str] = select_device()
         self._CHUNK_LIM: uint32 = chunk_limit
         self._VAD: VoiceActivityDetector = VoiceActivityDetector(
             mode=vad_mode,
@@ -123,13 +135,15 @@ class TranscriptionService:
 
     @property
     def DEVICE(self) -> str:
-        """Inference device: the least-loaded CUDA GPU, or ``"cpu"``."""
+        """Inference device: the least-loaded CUDA/XPU GPU, or ``"cpu"``."""
         return self._DEVICE
 
     def release_cuda_cache(self) -> None:
-        """Return cached CUDA blocks to the driver (call between jobs)."""
+        """Return cached accelerator memory to the driver (call between jobs)."""
         if self._DEVICE.startswith("cuda"):
             cuda.empty_cache()
+        elif self._DEVICE.startswith("xpu"):
+            torch.xpu.empty_cache()
 
     @property
     def VAD(self) -> VoiceActivityDetector:
@@ -229,6 +243,8 @@ class TranscriptionService:
         device = self._TRANSCRIBER.device
         options = DecodingOptions(
             temperature=0,
+            # fp16 activations on CUDA; XPU stays fp32 - fp16 measured ~1.5x
+            # slower on the Arc A770 (extra cast kernels, launch-bound).
             fp16=device.type == "cuda",
             language="en",
             without_timestamps=True,
@@ -332,8 +348,8 @@ class TranscriptionService:
 
         Exactly one progress record is yielded per source chunk so callers can
         render a live percentage.  ``fraction`` is the portion of the recording
-        processed so far (``0.0``–``1.0``); chunks that produce no text —
-        VAD-filtered or silent — still advance ``fraction`` and come back with
+        processed so far (``0.0``-``1.0``); chunks that produce no text -
+        VAD-filtered or silent - still advance ``fraction`` and come back with
         ``segment=None``.
         """
         samples_per_chunk = int(self._CHUNK_LIM)
@@ -373,7 +389,7 @@ class TranscriptionService:
 
         Timestamps are estimated from the fixed chunk length.  When
         ``enable_vad`` is set, buffers without detectable speech are skipped
-        entirely — they waste GPU time and can hallucinate from ambient noise.
+        entirely - they waste GPU time and can hallucinate from ambient noise.
         For per-chunk progress reporting use ``iter_transcribed_progress``.
         """
         for progress in self.iter_transcribed_progress(

@@ -19,13 +19,15 @@ from typing import (
 )
 from uuid import uuid4
 
-from ollama import AsyncClient, ChatResponse, Image, Message, Tool
+from ollama import ChatResponse, Image, Message, Tool
 from pydantic import BaseModel, ConfigDict
 
 from ..audio import TranscriptionJob
 from ..common import EXPORTDIR, ensure_directory
 from ..imaging._types import ImageExtensions
 from ..textual._types import TextualMimeTypeEnum
+from ._backends import BackendKind, create_backend, resolve_backend_kind
+from ._models import get_model_registry
 from ._types import SessionConfig, SessionExport
 
 
@@ -66,7 +68,7 @@ class ParsedResponse(BaseModel):
         """
         Wrap a non-streaming ``ChatResponse`` in a ``ParsedResponse``.
 
-        The returned ``message`` is the raw response message — append it to
+        The returned ``message`` is the raw response message - append it to
         history directly::
 
             response = await sess.send(stream=False)
@@ -99,7 +101,7 @@ class ParsedResponse(BaseModel):
 
             # stream to the terminal while collecting
             # (if you need live output, iterate manually and pass the assembled
-            #  Message to add_message yourself — see note below)
+            #  Message to add_message yourself - see note below)
             print(parsed.content)
             await sess.add_message(parsed.message)
 
@@ -152,26 +154,32 @@ class ParsedResponse(BaseModel):
 
 class MessageSession:
     """
-    Async chat session wrapping a single ``ollama.AsyncClient``.
+    Async chat session over a pluggable LLM backend (Ollama or llama.cpp).
 
     Stores conversation history separately from system prompts; system prompts
     are prepended at ``send()``-time so they are never part of the history you
     iterate over, save, or queue.
+
+    The backend is chosen by ``config.backend`` (see
+    :class:`~src.messaging.SessionConfig`); model names are resolved through
+    the shared :class:`~src.messaging._models.ModelRegistry` so the same
+    logical model works on either backend.
 
     Attributes are only accessible via properties; no public mutators.  All
     mutation goes through ``async`` methods that hold ``_lock`` while writing.
     """
 
     __slots__ = (
-        "_config",
-        "_tools",
+        "_backend_kind",
         "_client",
-        "_uid",
+        "_config",
         "_history",
-        "_system_prompts",
-        "_ref_count",
         "_lock",
         "_logger",
+        "_ref_count",
+        "_system_prompts",
+        "_tools",
+        "_uid",
     )
 
     def __init__(
@@ -182,10 +190,8 @@ class MessageSession:
     ) -> None:
         self._uid: str = str(uuid4())
         self._config: SessionConfig = config
-        self._client: AsyncClient = AsyncClient(
-            host=config.host,
-            timeout=config.timeout,
-        )
+        self._backend_kind: BackendKind = resolve_backend_kind(config.backend)
+        self._client = create_backend(config)
         self._history: list[Message] = []
         self._system_prompts: list[Message] = list(system_prompts or [])
         self._tools: list[Tool | Callable[..., Any]] = list(tools or [])
@@ -239,7 +245,7 @@ class MessageSession:
         data = await self.export()
         out = export_dir / f"session_{self._uid}_{data['timestamp']}.json"
         out.write_text(dumps(data, indent=4, ensure_ascii=False), encoding="utf-8")
-        self._log(f"save → {out}", DEBUG)
+        self._log(f"save -> {out}", DEBUG)
         return out
 
     async def start(self) -> None:
@@ -251,7 +257,7 @@ class MessageSession:
     async def close(self, force: bool = False) -> None:
         """
         Decrement the reference count.  When it reaches zero (or ``force=True``),
-        close the underlying ``AsyncClient`` and release connections.
+        close the underlying backend client and release connections.
         """
         async with self._lock:
             self._ref_count = max(0, self._ref_count - 1)
@@ -296,13 +302,17 @@ class MessageSession:
             self._history.clear()
             self._log("clear_history: history cleared.", DEBUG)
 
-    def _full_messages(self) -> list[Message]:
+    def _full_messages(self) -> tuple[Message, ...]:
         """
-        Concatenate system prompts + history into the final list sent to Ollama.
-        Called inside ``send()``; does NOT acquire the lock (caller must hold it
-        or guarantee no concurrent writes).
+        Concatenate system prompts + history into the final sequence sent to the
+        backend.  Does NOT acquire the lock; the caller must hold it.
+
+        Returns a tuple: the message count is known at call time and the result
+        is iterated once and never mutated, so there is nothing to gain from a
+        list.  It also means the snapshot cannot be mutated by a later
+        ``add_message`` while a request is in flight.
         """
-        return [*self._system_prompts, *self._history]
+        return (*self._system_prompts, *self._history)
 
     def parse_content(
         self,
@@ -312,18 +322,18 @@ class MessageSession:
         """
         Parse a `Message` from raw content; strings, file paths or a mix of.
         Supported:
-            - ``str``          → inline text content
+            - ``str``          -> inline text content
             - ``Path`` to image (.png / .jpg / .jpeg / .gif / .bmp / .webp)
-                               → passed directly as Ollama ``images``
+                               -> passed directly as Ollama ``images``
                                  (Ollama handles base-64 encoding internally)
-            - ``Path`` to text file (.txt / .md / .csv / .json / …)
-                               → content read and injected as text
+            - ``Path`` to text file (.txt / .md / .csv / .json / ...)
+                               -> content read and injected as text
             - ``Path`` to ``.pdf``
-                               → text extracted via ``pypdf`` (optional dep)
+                               -> text extracted via ``pypdf`` (optional dep)
             - ``Path`` to ``.docx``
-                               → text extracted via ``python-docx`` (optional dep)
+                               -> text extracted via ``python-docx`` (optional dep)
             - ``list[str | Path]``
-                               → any combination of the above; text parts are
+                               -> any combination of the above; text parts are
                                  joined with blank lines, images are collected
                                  into the ``images`` field
 
@@ -480,9 +490,10 @@ class MessageSession:
         keep_alive: float | str | None = None,
     ) -> ChatResponse | AsyncIterator[ChatResponse]:
         """
-        Send the current history (with system prompts prepended) to Ollama.
+        Send the current history (with system prompts prepended) to the
+        configured backend (Ollama or llama.cpp).
 
-        The assistant's response is **not** appended to history automatically —
+        The assistant's response is **not** appended to history automatically -
         the caller decides what to keep.  Typical pattern::
 
             user_msg = session.parse_content("Explain this chart", Path("chart.png"))
@@ -505,11 +516,18 @@ class MessageSession:
         ``format`` accepts a JSON schema dict (structured output), ``"json"``
         (unstructured JSON mode), or ``None`` (default free-form text).
         """
-        full_messages = self._full_messages()
+        # Snapshot history under the lock.  Every mutator holds ``_lock``; if
+        # this read did not, a concurrent add_message() would mutate the
+        # sequence being serialised into the request.  The lock is released
+        # before the request goes out so inference never serialises the session.
+        async with self._lock:
+            full_messages = self._full_messages()
+
         options = self._config.to_options() or None
+        model = get_model_registry().resolve(self._config.model, self._backend_kind)
 
         kwargdict: dict[str, Any] = dict(
-            model=self._config.model,
+            model=model,
             messages=full_messages,
             stream=stream,
             tools=self._tools or None,
@@ -537,13 +555,13 @@ class MessageSession:
         keep_alive: "float | str | None" = None,
     ) -> ParsedResponse:
         """
-            Agentic tool-call loop: send → dispatch tool calls → send again until
+            Agentic tool-call loop: send -> dispatch tool calls -> send again until
             the model stops requesting tools or ``max_rounds`` is reached.
 
             Each intermediate round's assistant message and tool-result messages
             are appended to history automatically so the model has full context on
             every subsequent turn.  The **final** assistant response is *not*
-            appended — the caller controls that, consistent with ``send()``.
+            appended - the caller controls that, consistent with ``send()``.
 
             Tool functions may be sync or async.  Return values are coerced to
             ``str`` before being sent back as tool-result messages.  Exceptions are
@@ -555,19 +573,19 @@ class MessageSession:
                 ``{function_name: callable}`` mapping.  The names must match
                 exactly what the model sends in ``tool_calls[].function.name``.
             max_rounds:
-                Safety cap on the dispatch loop.  Raises no error on exhaustion —
+                Safety cap on the dispatch loop.  Raises no error on exhaustion -
                 instead sends one final time and returns whatever the model says.
 
-            Usage—sync tools::
+            Usage - sync tools::
 
                 def get_weather(city: str) -> str:
-                    return f"Sunny, 22°C in {city}"
+                    return f"Sunny, 22C in {city}"
 
                 parsed = await sess.send_with_tools({"get_weather": get_weather})
                 await sess.add_message(parsed.message)
                 print(parsed.content)
 
-            Usage—async tools::
+            Usage - async tools::
 
                 async def search_db(query: str) -> str:
                     rows = await db.fetch(query)
@@ -585,7 +603,7 @@ class MessageSession:
             parsed = ParsedResponse.from_response(response)
 
             if not parsed.tool_calls:
-                # Model is done — no more tool calls requested.
+                # Model is done - no more tool calls requested.
                 return parsed
 
             self._log(

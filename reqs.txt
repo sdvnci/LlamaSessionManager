@@ -2,6 +2,7 @@ ollama
 python-dotenv
 aenum
 pydantic
+httpx
 websockets
 python-docx
 pypdf

@@ -28,6 +28,11 @@ class SessionConfig:
             "context_length": 40960,
             "system": "You are a helpful and precise assistant ..."
         }
+
+    ``host`` is the inference server's base URL for the active backend:
+    Ollama's HTTP port for ``backend="ollama"``, llama-server's HTTP port
+    for ``backend="llamacpp"``.  ``backend`` may be ``None`` to inherit the
+    ``LLM_BACKEND`` environment variable (default ``"ollama"``).
     """
 
     model: str
@@ -44,11 +49,12 @@ class SessionConfig:
     system: str | None = None
     host: str = "http://localhost:11434"
     timeout: float = 600.0
+    backend: str | None = None
 
     def __hash__(self) -> int:
         raw = (
             f"{self.model}:{self.name}:{self.system}:"
-            f"{self.temperature}:{self.top_p}:{self.top_k}:{self.host}"
+            f"{self.temperature}:{self.top_p}:{self.top_k}:{self.host}:{self.backend}"
         )
         digest = int.from_bytes(sha256(raw.encode()).digest()[:8], "big", signed=True)
         return -2 if digest == -1 else digest
@@ -64,6 +70,7 @@ class SessionConfig:
             and self.top_p == other.top_p
             and self.top_k == other.top_k
             and self.host == other.host
+            and self.backend == other.backend
         )
 
     def to_options(self) -> dict[str, Any]:
@@ -111,7 +118,7 @@ class SessionConfig:
 
         data: dict[str, Any] = loads(path.read_text(encoding="utf-8"))
         if "models" in data:
-            # Multi-model file — caller should iterate themselves, but
+            # Multi-model file - caller should iterate themselves, but
             # we handle the single-entry case gracefully.
             entries: list[dict[str, Any]] = data["models"]
             if not entries:

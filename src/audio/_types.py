@@ -163,7 +163,7 @@ class TranscriptProgress:
 
     ``segment`` is ``None`` when the chunk produced no text (VAD-filtered or
     silent); ``fraction`` is the portion of the recording processed so far
-    (``0.0``–``1.0``) and advances regardless, so callers can render a live
+    (``0.0``-``1.0``) and advances regardless, so callers can render a live
     percentage.
     """
 
@@ -311,7 +311,7 @@ class TranscriptArtifact(BaseModel):
         self.write_metadata()
 
     def append_segment(self, segment: TranscriptSegment) -> None:
-        """Write a single segment as one JSON line — call as each segment arrives."""
+        """Write a single segment as one JSON line - call as each segment arrives."""
         with self.record.segments_path.open("a", encoding="utf-8") as f:
             f.write(dumps(segment.model_dump(mode="json"), ensure_ascii=False))
             f.write("\n")

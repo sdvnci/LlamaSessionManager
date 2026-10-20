@@ -1,4 +1,4 @@
-"""Public API for the audio module — transcription, workers, and types."""
+"""Public API for the audio module - transcription, workers, and types."""
 
 from ._types import (
     AudioMimeTypeEnum,

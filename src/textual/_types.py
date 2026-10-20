@@ -21,14 +21,14 @@ TextualExtensions = Literal[
     "cpp",
     "yaml",
     "toml",
-    # ---- MS Word ----
+    # MS Word
     "doc",
     "dot",
     "docx",
     "dotx",
     "docm",
     "dotm",
-    # ---- MS Excel ----
+    # MS Excel
     "xls",
     "xlt",
     "xla",
@@ -38,7 +38,7 @@ TextualExtensions = Literal[
     "xltm",
     "xlam",
     "xlsb",
-    # ---- MS PowerPoint ----
+    # MS PowerPoint
     "ppt",
     "pot",
     "pps",
@@ -50,7 +50,7 @@ TextualExtensions = Literal[
     "pptm",
     "potm",
     "ppsm",
-    # ---- MS Access ----
+    # MS Access
     "mdb",
 ]
 
@@ -71,13 +71,13 @@ class TextualMimeTypeEnum(MimeTypeEnum):
     TSV = "text/tab-separated-values"
     YAML = "application/x-yaml"
     TOML = "application/toml"
-    # ---- MS Word ----
+    # MS Word
     MSWORD = "application/msword"
     DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     DOTX = "application/vnd.openxmlformats-officedocument.wordprocessingml.template"
     DOCM = "application/vnd.ms-word.document.macroEnabled.12"
     DOTM = "application/vnd.ms-word.template.macroEnabled.12"
-    # ---- MS Excel ----
+    # MS Excel
     MSEXCEL = "application/vnd.ms-excel"
     XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     XLTX = "application/vnd.openxmlformats-officedocument.spreadsheetml.template"
@@ -85,7 +85,7 @@ class TextualMimeTypeEnum(MimeTypeEnum):
     XLTM = "application/vnd.ms-excel.template.macroEnabled.12"
     XLAM = "application/vnd.ms-excel.addin.macroEnabled.12"
     XLSB = "application/vnd.ms-excel.sheet.binary.macroEnabled.12"
-    # ---- MS PowerPoint ----
+    # MS PowerPoint
     MSPOWERPOINT = "application/vnd.ms-powerpoint"
     PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     POTX = "application/vnd.openxmlformats-officedocument.presentationml.template"
@@ -94,7 +94,7 @@ class TextualMimeTypeEnum(MimeTypeEnum):
     PPTM = "application/vnd.ms-powerpoint.presentation.macroEnabled.12"
     POTM = "application/vnd.ms-powerpoint.template.macroEnabled.12"
     PPSM = "application/vnd.ms-powerpoint.slideshow.macroEnabled.12"
-    # ---- MS Access ----
+    # MS Access
     MSACCESS = "application/vnd.ms-access"
 
     @overload
@@ -128,7 +128,7 @@ class TextualMimeTypeEnum(MimeTypeEnum):
                 return cls.TOML
             case "pdf":
                 return cls.PDF
-            # ---- MS Word ----
+            # MS Word
             case "doc" | "dot":
                 return cls.MSWORD
             case "docx":
@@ -139,7 +139,7 @@ class TextualMimeTypeEnum(MimeTypeEnum):
                 return cls.DOCM
             case "dotm":
                 return cls.DOTM
-            # ---- MS Excel ----
+            # MS Excel
             case "xls" | "xlt" | "xla":
                 return cls.MSEXCEL
             case "xlsx":
@@ -154,7 +154,7 @@ class TextualMimeTypeEnum(MimeTypeEnum):
                 return cls.XLAM
             case "xlsb":
                 return cls.XLSB
-            # ---- MS PowerPoint ----
+            # MS PowerPoint
             case "ppt" | "pot" | "pps" | "ppa":
                 return cls.MSPOWERPOINT
             case "pptx":
@@ -171,7 +171,7 @@ class TextualMimeTypeEnum(MimeTypeEnum):
                 return cls.POTM
             case "ppsm":
                 return cls.PPSM
-            # ---- MS Access ----
+            # MS Access
             case "mdb":
                 return cls.MSACCESS
             case _:

@@ -109,7 +109,6 @@ class LandRegisterOCRDocument(
     OCREnabledDocument,
     label="LandRegister",
     slices=[
-        # --- registration ---
         DocumentSlice(
             label="registration",
             programmatic=False,
@@ -120,7 +119,6 @@ class LandRegisterOCRDocument(
                 "in this land register title section. Raw text only."
             ),
         ),
-        # --- appurtenances ---
         DocumentSlice(
             label="appurtenances",
             programmatic=False,
@@ -131,7 +129,6 @@ class LandRegisterOCRDocument(
                 "in this lease summary section. Include Lessor, Lessee, Rent, Term. Raw text only."
             ),
         ),
-        # --- parcel information ---
         DocumentSlice(
             label="parcel information",
             programmatic=False,
@@ -142,7 +139,6 @@ class LandRegisterOCRDocument(
                 "in this parcel details section. Raw text only."
             ),
         ),
-        # --- proprietorship instruments ---
         DocumentSlice(
             label="proprietorship instruments",
             programmatic=False,
@@ -153,7 +149,6 @@ class LandRegisterOCRDocument(
                 "in this instrument table section. Raw text only."
             ),
         ),
-        # --- proprietorship personas ---
         DocumentSlice(
             label="proprietorship personas",
             programmatic=False,
@@ -164,7 +159,6 @@ class LandRegisterOCRDocument(
                 "in this ownership/proprietor section. Raw text only."
             ),
         ),
-        # --- incumbrance instruments ---
         DocumentSlice(
             label="incumbrance instruments",
             programmatic=False,
@@ -175,7 +169,6 @@ class LandRegisterOCRDocument(
                 "in this encumbrance instrument table. Raw text only."
             ),
         ),
-        # --- incumbrance particulars ---
         DocumentSlice(
             label="incumbrance particulars",
             programmatic=False,

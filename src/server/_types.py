@@ -30,5 +30,7 @@ class Error(TypedDict):
 
 
 class ErrorResponse:
+    __slots__ = ("errors", "session_uid")
+
     errors: list[Error]
     session_uid: str | None

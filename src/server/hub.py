@@ -1,6 +1,6 @@
 """Fan-out of transcription events to session-bound WebSocket subscribers.
 
-The worker subprocess never touches sockets — it only emits
+The worker subprocess never touches sockets - it only emits
 ``AudioProcessingEvent``s over its IPC queue.  The dispatcher (running in the
 server's event loop) hands every event to ``TranscriptionHub.handle_event``,
 which serialises it and enqueues a copy for each subscribed connection.
@@ -10,11 +10,9 @@ disposable, and the buffer is large enough that a healthy client always keeps
 up with the terminal event.
 """
 
-from __future__ import annotations
-
 import asyncio
 import json
-from typing import Any, ClassVar
+from typing import Any, ClassVar, final
 
 from ..audio import AudioProcessingEvent, TranscriptionJob
 from ..messaging import SessionManager
@@ -22,8 +20,11 @@ from ..messaging import SessionManager
 MAX_QUEUE_DEPTH: int = 1024
 
 
+@final
 class TranscriptionHub:
     """Session-keyed registry of WebSocket subscriber queues."""
+
+    __slots__ = ()
 
     _subscribers: ClassVar[dict[str, set[asyncio.Queue[str]]]] = {}
     _lock: ClassVar[asyncio.Lock] = asyncio.Lock()

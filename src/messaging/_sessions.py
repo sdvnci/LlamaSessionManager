@@ -56,7 +56,7 @@ class SessionManager:
     ``get_session``       Look up a session by UID.
     ``close_session``     Decrement ref-count; evict when it reaches zero.
     ``evict_session``     Force-remove and close a session immediately.
-    ``scoped_session``    Context manager: create → yield → save → evict.
+    ``scoped_session``    Context manager: create -> yield -> save -> evict.
 
     Queue operations
     ------------------
@@ -162,7 +162,7 @@ class SessionManager:
     ) -> AsyncGenerator[MessageSession, None]:
         """
         Async context manager: create a session, register it, yield it, then
-        save (optionally) and evict on exit — even on exception.
+        save (optionally) and evict on exit - even on exception.
 
         This is the recommended entry point for all session usage.
 
@@ -178,9 +178,16 @@ class SessionManager:
         try:
             yield sess
         finally:
-            if save_on_exit:
-                await sess.save(export_dir=export_dir)
-            await cls.evict_session(sess.uid, save=False)
+            try:
+                if save_on_exit:
+                    await sess.save(export_dir=export_dir)
+            except Exception:
+                LOGGER.exception(
+                    "scoped_session:::save failed for %s; evicting anyway.",
+                    sess.uid[:8],
+                )
+            finally:
+                await cls.evict_session(sess.uid, save=False)
 
     @classmethod
     async def create_queue(
@@ -344,10 +351,18 @@ class SessionManager:
         if cls._background_pool is not None:
             return cls._background_pool
 
-        pool = BackgroundWhisperProcessPool(model_name)
-        await pool.start()
-        cls._background_pool = pool
-        cls._dispatcher_task = create_task(cls._dispatch_events())
+        async with cls._transcription_lock:
+            # Re-check under the lock. ``pool.start()`` awaits, so without this
+            # two callers both pass the check above and both load Whisper,
+            # leaving one worker process orphaned with no dispatcher reading it.
+            if cls._background_pool is not None:
+                return cls._background_pool
+
+            pool = BackgroundWhisperProcessPool(model_name)
+            await pool.start()
+            cls._background_pool = pool
+            cls._dispatcher_task = create_task(cls._dispatch_events())
+
         LOGGER.info("start_background_pool:::worker '%s' ready.", model_name)
         return pool
 
@@ -484,16 +499,25 @@ class SessionManager:
         pool = cls._background_pool
         assert pool is not None, "_dispatch_events started without a pool"
         while cls._background_pool is pool:
-            event = await pool.next_event()  # type: ignore[union-attr]
-            async with cls._transcription_lock:
-                if event.job_uid not in cls._transcriptions:
-                    LOGGER.debug(
-                        "_dispatch_events:::job %s already evicted; skipping event %s",
-                        event.job_uid[:8],
-                        event.kind.value,
-                    )
-                    continue
-            await cls.handle_transcription_event(event)
+            try:
+                event = await pool.next_event()  # type: ignore[union-attr]
+                async with cls._transcription_lock:
+                    if event.job_uid not in cls._transcriptions:
+                        LOGGER.debug(
+                            "_dispatch_events:::job %s already evicted; skipping event %s",
+                            event.job_uid[:8],
+                            event.kind.value,
+                        )
+                        continue
+                await cls.handle_transcription_event(event)
+            except CancelledError:
+                raise
+            except Exception:
+                # Nothing awaits this task, so an escaping exception would kill
+                # the loop silently and strand every later event.
+                LOGGER.exception(
+                    "_dispatch_events:::event handling failed; continuing."
+                )
 
     @classmethod
     def register_event_consumer(
@@ -513,10 +537,12 @@ class SessionManager:
     async def handle_transcription_event(cls, event: AudioProcessingEvent) -> None:
         """Apply a worker event to its record, then fan it out to consumers.
 
-        Record updates (including ingest/evict on terminal events) happen
-        under the transcription lock; consumers run outside it so a slow
-        subscriber can never stall job-state bookkeeping.
+        Record updates happen under the transcription lock.  Session ingest
+        and consumers both run outside it: ingest acquires the pool lock and
+        touches the filesystem, and a slow subscriber must never stall
+        job-state bookkeeping.
         """
+        terminal: TranscriptionJob | None = None
         async with cls._transcription_lock:
             record = cls._transcriptions.get(event.job_uid)
             if record is None:
@@ -528,8 +554,11 @@ class SessionManager:
             if event.duration_seconds is not None:
                 record.duration_seconds = event.duration_seconds
             if event.state.is_terminal:
-                await cls.ingest_transcription_into_session(record)
+                terminal = record
                 cls._transcriptions.pop(event.job_uid, None)
+
+        if terminal is not None:
+            await cls.ingest_transcription_into_session(terminal)
 
         for consumer in tuple(cls._event_consumers):
             with suppress(Exception):
@@ -567,13 +596,23 @@ class SessionManager:
 
         The ``inline_eligible`` flag uses the transcript's character count
         (not raw byte size) against ``MAX_INLINE_TRANSCRIPT_CHARS``.
+
+        UTF-8 never encodes a character in fewer than one byte, so the file
+        size is an upper bound on the character count.  Anything larger than
+        the threshold is rejected on ``stat`` alone, which means the only file
+        ever read here is one already at most ``MAX_INLINE_TRANSCRIPT_CHARS``
+        bytes long.  Reading an unbounded transcript inline would block the
+        event loop.
         """
         transcript_path = record.transcript_path
-        transcript_len = (
-            len(transcript_path.read_text(encoding="utf-8"))
-            if transcript_path.exists()
-            else 0
-        )
+        if not transcript_path.exists():
+            inline_eligible = True
+        else:
+            inline_eligible = (
+                transcript_path.stat().st_size <= MAX_INLINE_TRANSCRIPT_CHARS
+                and len(transcript_path.read_text(encoding="utf-8"))
+                <= MAX_INLINE_TRANSCRIPT_CHARS
+            )
         return {
             "artifact_kind": "transcript",
             "job_id": record.uid,
@@ -583,5 +622,5 @@ class SessionManager:
             "subtitle_format": record.subtitle_format,
             "summary_path": record.summary_path,
             "source_name": record.source.source_name if record.source else None,
-            "inline_eligible": transcript_len <= MAX_INLINE_TRANSCRIPT_CHARS,
+            "inline_eligible": inline_eligible,
         }

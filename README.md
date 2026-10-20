@@ -7,7 +7,8 @@
 [![Validation: Pydantic v2](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/pydantic/pydantic/main/docs/badge/v2.json)](https://pydantic.dev)
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
 
-A simple service for running conversations with local AI models through Ollama.
+A simple service for running conversations with local AI models through Ollama
+or llama.cpp's `llama-server`.
 Handles message history, multi-session pooling, audio transcription, image OCR,
 tool dispatch, and session persistence
 
@@ -15,10 +16,12 @@ tool dispatch, and session persistence
 ## What you need
 
 - **Python 3.13+** : [python.org](https://python.org)
-- **Ollama** : [ollama.com](https://ollama.com) (runs the AI models)
+- **Ollama** : [ollama.com](https://ollama.com) (runs the AI models), or
+  **llama.cpp** : [llama.cpp](https://github.com/ggml-org/llama.cpp) (`llama-server`)
 - **ffmpeg** : `winget install ffmpeg` on Windows, or `brew install ffmpeg` on Mac
 - **Docker** (optional, for the server) : [docker.com](https://docker.com)
-- **NVIDIA GPU** (recommended for transcription): a modern 8 GB card comfortably runs Whisper `large-v3`
+- **NVIDIA GPU** (recommended for transcription): a modern 8 GB card comfortably runs Whisper `large-v3`.
+  Intel Arc (XPU) is also picked up automatically when no CUDA device is present
 
 ## Install
 
@@ -73,6 +76,48 @@ async def chat():
 
 asyncio.run(chat())
 ```
+
+---
+
+## Choosing a backend : Ollama or llama.cpp
+
+Sessions talk to either inference server without code changes. Pick one per
+session with `SessionConfig.backend`, or process-wide with the `LLM_BACKEND`
+environment variable (`ollama` / `llamacpp`, default `ollama`).
+
+```python
+cfg = SessionConfig(
+    model="gpt-oss-20b",
+    name="my-bot",
+    backend="llamacpp",
+    host="http://localhost:8082",  # llama-server's HTTP port
+)
+```
+
+Both backends can serve the same GGUF files but name them differently
+(Ollama uses tags, `llama-server` uses the alias/filename it was launched with).
+An optional model registry maps the logical name you pass as `model` onto the
+right id per backend. It is read from `MODEL_REGISTRY`, else
+`artifacts/model-registry.json`, once per process:
+
+```json
+{
+  "gpt-oss:20b": { "ollama": "gpt-oss:20b", "llamacpp": "gpt-oss-20b" },
+  "deepseek-ocr": "deepseek-ocr"
+}
+```
+
+A plain string means the same name works on both; unknown names pass through
+unchanged.
+
+Limitations on `llamacpp`:
+
+| Feature | Behaviour |
+| --- | --- |
+| `context_length` / `num_ctx` | Fixed at `llama-server` launch (`--ctx-size`); per-request values are dropped. |
+| `think` | Not exposed on `/v1`; configure thinking via the chat template at launch. |
+| `keep_alive` | No-op : models stay resident until the server exits. |
+| Tool-call ids | Synthesised from call order to match Ollama's order-paired tool results. |
 
 ---
 

@@ -3,7 +3,7 @@ Defs for Long-lived transcription workers and the background subsystem that driv
 
 The worker runs in its own process, owns one Whisper model, pulls
 ``TranscriptionJobRequest``s off an IPC queue, and emits ``AudioProcessEvent``s.
-It never touches sockets or live sessions — the main process owns those.
+It never touches sockets or live sessions - the main process owns those.
 """
 
 import logging as _logging
@@ -151,7 +151,7 @@ class TranscriptionWorker:
                     )
                 else:
                     # VAD-filtered or silent chunk: no text, but the position
-                    # in the recording still advances — report it so progress
+                    # in the recording still advances - report it so progress
                     # bars keep moving.
                     self._emit(
                         event_queue=event_queue,

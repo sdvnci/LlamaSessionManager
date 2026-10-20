@@ -1,4 +1,4 @@
-"""Public API for the common module — shared base models, types, and utilities."""
+"""Public API for the common module - shared base models, types, and utilities."""
 
 from ._types import (
     CreateStamped,

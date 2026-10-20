@@ -1,12 +1,10 @@
 """Runtime feature flags read from the environment.
 
 Keep this module dependency-free and importable from anywhere in the
-project — it is consumed by both the messaging layer (which decides whether
+project - it is consumed by both the messaging layer (which decides whether
 to spin up the Whisper worker) and the HTTP routes (which decide whether a
 transcription request may proceed).
 """
-
-from __future__ import annotations
 
 import os
 

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-# Project root (…/src/common/constants.py → up three levels).
+# Project root (.../src/common/constants.py -> up three levels).
 # Keeps artifacts/exports/logs on the host-mounted volumes in Docker.
 CWD = Path(__file__).parent.parent.parent.resolve()
 

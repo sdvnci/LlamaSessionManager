@@ -1,6 +1,6 @@
-"""Public API for the imaging module — image MIME types."""
+"""Public API for the imaging module - image MIME types."""
 
-from ._types import ImageMimeTypeEnum
+from ._types import ImageMimeTypeEnum, downscale_image
 from .slicer import (
     DocumentSlice,
     LandRegisterOCRDocument,
@@ -14,4 +14,5 @@ __all__ = (
     "OCREnabledDocument",
     "LandRegisterOCRDocument",
     "OCREnabledDocumentEnum",
+    "downscale_image",
 )

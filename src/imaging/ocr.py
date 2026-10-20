@@ -55,7 +55,7 @@ def tesseract_ocr(
         import pytesseract  # type: ignore[import-untyped]
     except ImportError:
         raise RuntimeError(
-            "pytesseract is required for OCR — pip install pytesseract "
+            "pytesseract is required for OCR - pip install pytesseract "
             "and install the Tesseract engine: "
             "https://github.com/tesseract-ocr/tesseract"
         ) from None
